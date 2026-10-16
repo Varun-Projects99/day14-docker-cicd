@@ -1,0 +1,43 @@
+
+name: Docker CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: winter-arc-app:test
+
+      - name: Run container health test
+        run: |
+          docker run -d --name test-app -p 5000:5000 winter-arc-app:test
+          for i in {1..10}; do
+            if curl --fail http://localhost:5000/health; then
+              docker rm -f test-app
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs test-app
+          docker rm -f test-app
+          exit 1
